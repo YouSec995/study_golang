@@ -5,14 +5,13 @@ import (
 	xerrors "github.com/pkg/errors"
 )
 
-func DealError() error {
-	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:9090)/test?parseTime=true")
-	if err != nil {
-		return xerrors.Wrap(err, "msg: open \"mysql\" failed")
-	}
+func DealError(db *sql.DB) error {
 	var s string
-	rows := db.QueryRow("SELECT shuaibi FROM test.hello LIMIT 1")
-	xerrors.Wrap(rows.Err(), "msg: can not find shuaibi")
-	err = rows.Scan(&s)
-	return xerrors.Wrap(err, "msg: Scan copies the columns from the matched row into the value failed")
+	sqlQueryRow := "SELECT shuaibi FROM test.hello LIMIT 1"
+	rows := db.QueryRow(sqlQueryRow)
+	if rows.Err() != nil {
+		// 查询不到往上抛，因为可能是username、pw校验等重要信息,让上层对rows.Err()做sentinel errors类型断言处理
+		return xerrors.Wrapf(rows.Err(), "msg: Excute sql QueryRow [%v] failed", sqlQueryRow)
+	}
+	return xerrors.Wrap(rows.Scan(&s), "msg: Scan copies the columns from the matched row into the value failed")
 }

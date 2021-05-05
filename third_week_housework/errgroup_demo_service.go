@@ -30,15 +30,16 @@ func main() {
 			Handler: mux,
 		}
 
-		time.Sleep(3 * time.Second) // 假设有三秒延迟发生，超过2秒超时上限
+		time.Sleep(1 * time.Second) // 假设有三秒延迟发生，超过2秒超时上限
 		fmt.Println("ctx1")
-		err := CheckErr(ctx, stop, exit)
+		var err error
 
 		go func() {
+			err = CheckErr(ctx, stop, exit)
 			// 若 stop 没有被关闭时，则 goroutine 阻塞在这儿
 			<-stop
 			// 在 stop 关闭之后调用 shutDown 关闭这个 ListenAndServe
-			server.Shutdown(context.Background())
+			server.Shutdown(ctx)
 		}()
 
 		if err != nil {
@@ -59,10 +60,11 @@ func main() {
 
 		time.Sleep(1 * time.Second)
 		fmt.Println("ctx2")
-		err := CheckErr(ctx, stop, exit)
+		var err error
 		go func() {
+			err = CheckErr(ctx, stop, exit)
 			<-stop
-			server.Shutdown(context.Background())
+			server.Shutdown(ctx)
 		}()
 		if err != nil {
 			// do sth
@@ -92,7 +94,7 @@ func (*helloWord) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hello World!")
 }
 
-// 用于接收携程的错误
+// 用于接收协程的错误和终止信号
 func CheckErr(ctx context.Context, stop chan struct{}, exit chan os.Signal) error {
 	select {
 	case <-ctx.Done():
@@ -100,9 +102,10 @@ func CheckErr(ctx context.Context, stop chan struct{}, exit chan os.Signal) erro
 		close(stop)
 		return ctx.Err()
 	case <-exit:
+		// 若接收到终止信号，则将通道 stop 关闭
 		close(stop)
 		return errors.New("killed...")
 	default:
-		return nil
 	}
+	return nil
 }
